@@ -12,10 +12,13 @@
 # While Person is a plain old Ruby object, inheriting from something like
 # ActiveModel::Relationships gives part of the dsl we are used to.  the clues
 # from that dsl could also be used by Repository implementations.
-
+#
+# It should also be aware of its own validations, and the current
+# ActiveModel::Validations would already work perfectly for that.
 class Person
   include ActiveModel::Relationships
-
+  include ActiveModel::Validations
+  
   has_many :hobbies
   belongs_to :fraternity
   
@@ -23,6 +26,8 @@ class Person
   attr_accessor :password
   attr_accessor :sex
   attr_accessor :born_on
+  
+  validates_presence_of :name, :password
 end
 
 # conventions like _on and _at are still used.
@@ -40,6 +45,14 @@ class PersonStore < ActiveRepository::Base
   map_attribute_to_column :sex, :gender
 end
 
+# I'm using inheritance here to enforce an opinion.  Of course this could
+# be a mixin, but my current thoughts are that this Repository should only
+# ever be a repository - after all, we are trying to get away from
+# ActiveRecords notion of "I'm the model and my own data store!".
+# Inheritance would be an appropriate way to signal this *is a* repository.
+# My fear is as a mixin, someone would think they are being clever by mixing
+# the repository directly into the domain model, essentially recreating
+# ActiveRecord and making this effort all for nothing.
 
 # I would really like to have the ability to 'new' model objects as normal:
 
@@ -53,6 +66,8 @@ p = PersonStore.build
 # saving is no longer done on the object, but through the repository
 
 PersonStore.save(p)
+
+# the save would be smart enough to call is_valid? if Validations were present.
 
 # all the usual finder suspects are on the repository
 p = PersonStore.find(5)
@@ -122,6 +137,14 @@ not_persisted :current_location
 
 ignore_column :eye_color
 
+# The generator could stick the attr_accessors in the class
+# automatically if we wanted it to.  I wouldn't do anything 'magical' like
+# have the persistence engine inject it with meta... that would make the
+# attributes hard to discover, and could make multiple repositories in an
+# app step on each other in nondeterministic ways.  By having attr_accessors,
+# the model becomes the 'system of record' for what it means to be that
+# kind of domain object.  I like that.
+
 # (of course, nosql dbs may have their own requirements met with their own
 # dsls).
 
@@ -147,9 +170,9 @@ end
 
 # Given this pattern, I relationship declarations go in the models,
 # since there they can add the appropriate methods to return collections,
-# etc, and since the repo knows what its supposed to manage, it can get 
-# access to the same knowledge to do whatever it needs to do.  If they were
-# declared in the repo, it would be inappropriate for the model to
+# etc, and since the repo knows what models it is supposed to manage, it can
+# get access to the same knowledge to do whatever it needs to do.  If they
+# were declared in the repo, it would be inappropriate for the model to
 # introspect there, otherwise the model would become 'persistence aware'.
 # They 'feel' a little attr_accessor-like things to me.
 
