@@ -102,13 +102,13 @@ p = PersonStore.find_by_name("Chris")
 # Since Person is nothing special, you could easily swap in a different
 # persistance Repository:
 
-Class PersonStore < RedisRepository::Base
+class PersonStore < RedisRepository::Base
 ...
 end
 
 # or even:
 
-Class PersonStore < RestfulResource::Repository
+class PersonStore < RestfulResource::Repository
   repository_for :person
   base_uri "http://coolstuff.livingsocial.com"
 end
@@ -123,13 +123,13 @@ end
 # And it might even be possible to have multiple repositories in the same
 # app...
 
-Class PersonStore < ActiveRepository::Base
+class PersonStore < ActiveRepository::Base
 #...
 end
 
 # and
 
-Class RemotePersonStore < RestfulResource::Repository
+class RemotePersonStore < RestfulResource::Repository
 #...
 end
 
