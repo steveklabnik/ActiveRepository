@@ -1,20 +1,29 @@
+# MOTIVATION:  As rails apps are growing, people are noticing the drawbacks
+# of the ActiveRecord pattern.  Several apps I have seen, and several
+# developers I have spoken to are looking towards other patterns for object
+# persistence.  The major drawback with ActiveRecord is that the notion
+# of the domain object is conflated with what it means to store/retrieve
+# it in any given format (like sql, json, key/value, etc).
+#
+# This is an attempt to codify the Repository pattern in a way that would
+# feel comfortable to beginner and seasoned Ruby developers alike.
+#
 # In the spirit of "make it look the way you want it to work, then make it
 # work like that", here is a vision of the Repository pattern ala Ruby. I
 # don't want to fault ActiveRecord for being an implementation of the
 # ActiveRecord pattern; At RailsConf 2006, in his keynote, Martin Fowler
 # said that ActiveRecord was "the most faithful implementation of the
 # Activerecord pattern [he] had ever seen", and he was the one that
-# documented that pattern in the first place.  So lets respect it for what
+# documented that pattern in the first place.  So lets respect AR for what
 # it is, and look at the repository pattern, done with Rails Flair.
 
 
 
-# While Person is a plain old Ruby object, inheriting from something like
-# ActiveModel::Relationships gives part of the dsl we are used to.  the clues
-# from that dsl could also be used by Repository implementations.
-#
-# It should also be aware of its own validations, and the current
-# ActiveModel::Validations would already work perfectly for that.
+# Person is a plain old Ruby object. It knows nothing about its persistence,
+# but as a domain model, it knows something about its own attributes,
+# relationships to other domain objects, as well as understands what it
+# means to be 'valid'. Of course, it also has behavior.
+
 class Person
   include ActiveModel::Relationships
   include ActiveModel::Validations
@@ -28,6 +37,18 @@ class Person
   attr_accessor :born_on
   
   validates_presence_of :name, :password
+  
+  def favorite_drink
+    if born_on < 7.years.ago
+      "apple juice"
+    elsif born_on < 18.years.ago
+      "coke or pepsi"
+    elsif < 21.years.ago
+      "mountain dew"
+    else
+      "beer"
+    end
+  end
 end
 
 # conventions like _on and _at are still used.
@@ -48,7 +69,7 @@ end
 # I'm using inheritance here to enforce an opinion.  Of course this could
 # be a mixin, but my current thoughts are that this Repository should only
 # ever be a repository - after all, we are trying to get away from
-# ActiveRecords notion of "I'm the model and my own data store!".
+# ActiveRecord's notion of "I'm the model and my own data store!".
 # Inheritance would be an appropriate way to signal this *is a* repository.
 # My fear is as a mixin, someone would think they are being clever by mixing
 # the repository directly into the domain model, essentially recreating
@@ -78,7 +99,8 @@ p = PersonStore.find_by_name("Chris")
 # we could also create things like scopes, etc.
 
 
-# Since Person is nothing special, you could easily swap in something like:
+# Since Person is nothing special, you could easily swap in a different
+# persistance Repository:
 
 Class PersonStore < RedisRepository::Base
 ...
@@ -97,7 +119,6 @@ end
 # thats ok.  The "Persistant Capable" classes don't change with a change in
 # the persistence mechanism. The "Persistent Aware" classes, like the
 # controllers, would.  
-
 
 # And it might even be possible to have multiple repositories in the same
 # app...
@@ -152,7 +173,17 @@ ignore_column :eye_color
 
 synthetic_field :age, { Date.today - born_on }
 
-# and as shown above, if you wanted a different attribute name, you could:
+# while you could do exactly the same thing by adding 'age' method to the
+# model, having it in he Repository could be useful for an ETL task, for
+# defining the transform step.  Imagine one database that has a born_on
+# field, and another one that has an age field, and you are transforming
+# data to go into the one with age...  in the store with the born_on,
+# set the store to have a synthetic field :age.  In the other store, set
+# it to ignore the born_on date. Then in the model you define attr_reader
+# for :age.  Both stores see the domain model as exactly what it needs in
+# order to make each database happy, and the domain model code stays clean.
+#
+# if you needed to map an attribute to a different column:
 
 map_attribute_to_column :sex, :gender
 
@@ -163,12 +194,13 @@ class PersonStore < ActiveRepository::Base
   repository_for :person
   repository_for :client
   repository_for :administrator
-  polymorphic_model_column :type
+  polymorphic_model_column :type # would automatically store the class
+                                 # type, just like AR polymorphism
 end
 
 
 
-# Given this pattern, I relationship declarations go in the models,
+# Given this pattern, I think relationship declarations go in the models,
 # since there they can add the appropriate methods to return collections,
 # etc, and since the repo knows what models it is supposed to manage, it can
 # get access to the same knowledge to do whatever it needs to do.  If they
@@ -183,7 +215,4 @@ end
 # Versant, and it had a 'bytecode enhancement' step that did exactly this
 # during the compile - it modified the classes bytecode with dirty flags
 # and other persistence helpers.
-
-
-
 
